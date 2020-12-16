@@ -62,7 +62,7 @@ if (Get-Module -ListAvailable -Name SkypeOnlineConnector) {
 
 
 # Is a session already in place and is it "Opened"?
-if((Get-PSSession | Where-Object {$_.Name -like "SfBPowerShellSession*"}).State -ne "Opened") {
+if((Get-PSSession | Where-Object {$_.ComputerName -like "*.online.lync.com"}).State -ne "Opened") {
 
     Write-Host "`nCreating PowerShell session to Skype Online..."
 
@@ -118,7 +118,7 @@ if ($UserReturned) {
         # Loop through each PSTN Usage and get the Voice Routes
         foreach ($PSTNUsage in $PSTNUsages) {
     
-            $VoiceRoutes += Get-CsOnlineVoiceRoute | Where-Object {$_.OnlinePstnUsages -contains $PSTNUsage} | Select-Object *,@{label=”PSTNUsage”; Expression= {$PSTNUsage}}
+            $VoiceRoutes += Get-CsOnlineVoiceRoute | Where-Object {$_.OnlinePstnUsages -contains $PSTNUsage} | Select-Object *,@{label="PSTNUsage"; Expression= {$PSTNUsage}}
 
         }
 
