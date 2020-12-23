@@ -62,7 +62,7 @@ if (Get-Module -ListAvailable -Name SkypeOnlineConnector) {
 
 
 # Is a session already in place and is it "Opened"?
-if(!$global:PSSession -or $global:PSSession.State -ne "Opened") {
+if((Get-PSSession | Where-Object {$_.ComputerName -like "*.online.lync.com"}).State -ne "Opened") {
 
     Write-Host "`nCreating PowerShell session to Skype Online..."
 
@@ -118,7 +118,7 @@ if ($UserReturned) {
         # Loop through each PSTN Usage and get the Voice Routes
         foreach ($PSTNUsage in $PSTNUsages) {
     
-            $VoiceRoutes += Get-CsOnlineVoiceRoute | Where-Object {$_.OnlinePstnUsages -contains $PSTNUsage} | Select-Object *,@{label=”PSTNUsage”; Expression= {$PSTNUsage}}
+            $VoiceRoutes += Get-CsOnlineVoiceRoute | Where-Object {$_.OnlinePstnUsages -contains $PSTNUsage} | Select-Object *,@{label="PSTNUsage"; Expression= {$PSTNUsage}}
 
         }
 
@@ -150,8 +150,43 @@ if ($UserReturned) {
 
     } else {
 
-        Write-Warning -Message "No Online Voice Routing Policy assgined to $user."
+        Write-Host "`rOnline Voice Routing Policy assigned to $user is: 'Global'" -ForegroundColor Green
 
+        # Get PSTN Usages assigned to Online Voice Routing Policy
+        $PSTNUsages = (Get-CsOnlineVoiceRoutingPolicy -Identity Global).OnlinePstnUsages
+
+        # Loop through each PSTN Usage and get the Voice Routes
+        foreach ($PSTNUsage in $PSTNUsages) {
+    
+            $VoiceRoutes += Get-CsOnlineVoiceRoute | Where-Object {$_.OnlinePstnUsages -contains $PSTNUsage} | Select-Object *,@{label="PSTNUsage"; Expression= {$PSTNUsage}}
+
+        }
+
+        # Find PSTN first matching PSTN Usage
+        Write-Host "`nFinding the first PSTN Usage with a Voice Route that matches $NormalisedNumber..."
+
+        $MatchedVoiceRoutes = $VoiceRoutes | Where-Object {$NormalisedNumber -match $_.NumberPattern}
+
+        if ($MatchedVoiceRoutes) {
+
+            $ChosenPSTNUsage = $MatchedVoiceRoutes[0].PSTNUsage
+
+            # Find Voice Routes that match normalised number and first matching PSTN Usage
+            Write-Host "`rFirst Matching PSTN Usage: '$ChosenPSTNUsage'"
+
+            $MatchedVoiceRoutes = $MatchedVoiceRoutes | Where-Object {$_.PSTNUsage -eq $ChosenPSTNUsage}
+
+            Write-Host "`rFound $(@($MatchedVoiceRoutes).Count) Voice Route(s) with matching pattern in PSTN Usage '$ChosenPSTNUsage', listing in priority order..." -ForegroundColor Green
+
+            $MatchedVoiceRoutes | Select-Object Name, NumberPattern, PSTNUsage, OnlinePstnGatewayList, Priority | Format-Table
+
+            Write-Host "Note: Once a Voice Route that matches is found in a PSTN Usage, all other Voice Routes in other PSTN Usages will be ignored." -ForegroundColor Yellow
+
+        } else {
+
+            Write-Warning -Message "No Voice Route with matching pattern found, unable to route call using Direct Routing."
+
+        }
     }
 
 } else {
