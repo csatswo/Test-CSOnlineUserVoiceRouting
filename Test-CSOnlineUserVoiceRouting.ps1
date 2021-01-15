@@ -24,6 +24,11 @@
     .\Test-CSOnlineUserVoiceRouting.ps1 -DialedNumber +441234567890 -User user@domain.com
     This will list any Voice Routes (in priority order) for user@domain.com calling +441234567890
 
+.NOTES
+
+    Script will now test against 'Global' voice routing policy as well.
+    Script also supports 'MicrosoftTeams' module, but the Skype module will be tested first.
+    If neither Skype or Teams modules are available, the Teams module will be installed.
 
 #>
 
@@ -38,7 +43,6 @@ param(
 $VoiceRoutes = @()
 $MatchedVoiceRoutes = @()
 
-# Start
 Write-Host "`n----------------------------------------------------------------------------------------------
             `n Test-CSOnlineUserVoiceRouting.ps1 - Lee Ford - https://www.lee-ford.co.uk
             `n----------------------------------------------------------------------------------------------" -ForegroundColor Yellow
@@ -46,38 +50,50 @@ Write-Host "`n------------------------------------------------------------------
 Write-Host "`nChecking voice routing of dialed number $DialedNumber for $user" -ForegroundColor Yellow
 
 # Do you have Skype Online module installed?
-Write-Host "`nChecking Skype Online Module installed..."
+Write-Host "`nChecking if Skype Online or Teams module is installed..."
 
 if (Get-Module -ListAvailable -Name SkypeOnlineConnector) {
     
     Write-Host "Skype Online Module installed." -ForegroundColor Green
 
-} else {
+    # Is a session already in place and is it "Opened"?
+    if((Get-PSSession | Where-Object {$_.ComputerName -like "*.online.lync.com"}).State -ne "Opened") {
 
-    Write-Error -Message "Skype Online Module not installed, please install and try again."
-        
-    break
+        Write-Host "`nCreating PowerShell session..."
 
-}
+        if ($OverrideAdminDomain) {
+            
+            $global:PSSession = New-CsOnlineSession -OverrideAdminDomain $OverrideAdminDomain
+            
+        } else {
+            
+            $global:PSSession = New-CsOnlineSession
 
-
-# Is a session already in place and is it "Opened"?
-if((Get-PSSession | Where-Object {$_.ComputerName -like "*.online.lync.com"}).State -ne "Opened") {
-
-    Write-Host "`nCreating PowerShell session to Skype Online..."
-
-    if ($OverrideAdminDomain) {
-
-        $global:PSSession = New-CsOnlineSession -OverrideAdminDomain $OverrideAdminDomain
-
-    } else {
-
-        $global:PSSession = New-CsOnlineSession
+        }
+    
+        Import-PSSession $global:PSSession -AllowClobber | Out-Null
 
     }
+
+} else {
+
+    # Do you have Teams module installed?
+    if (Get-Module -ListAvailable -Name MicrosoftTeams | ? {$_.Version -ge "1.1.6"}) {
+        
+        # Connect to Microsoft Teams
+        Write-Host "Teams Module installed." -ForegroundColor Green
+        Write-Host "`nCreating PowerShell session..."
+        Import-Module MicrosoftTeams;Import-PSSession -Session (New-CsOnlineSession) | Out-Null
+
+    } else {
     
-    # Import Session
-    Import-PSSession $global:PSSession -AllowClobber | Out-Null
+        # Install module and connect to Microsoft Teams
+        Write-Host "Teams Module not installed." -ForegroundColor Yellow
+        Write-Host "`nInstalling module and creating PowerShell session..."
+        Install-Module MicrosoftTeams
+        Import-Module MicrosoftTeams;Import-PSSession -Session (New-CsOnlineSession) | Out-Null
+
+    }
 
 }
 
