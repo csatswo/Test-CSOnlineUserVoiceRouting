@@ -77,21 +77,33 @@ if (Get-Module -ListAvailable -Name SkypeOnlineConnector) {
 
 } else {
 
-    # Do you have Teams module installed?
-    if (Get-Module -ListAvailable -Name MicrosoftTeams | ? {$_.Version -ge "1.1.6"}) {
-        
-        # Connect to Microsoft Teams
-        Write-Host "Teams Module installed." -ForegroundColor Green
-        Write-Host "`nCreating PowerShell session..."
-        Import-Module MicrosoftTeams;Import-PSSession -Session (New-CsOnlineSession) | Out-Null
-
-    } else {
+    function TeamsConnected {
     
-        # Install module and connect to Microsoft Teams
-        Write-Host "Teams Module not installed." -ForegroundColor Yellow
-        Write-Host "`nInstalling module and creating PowerShell session..."
-        Install-Module MicrosoftTeams
-        Import-Module MicrosoftTeams;Import-PSSession -Session (New-CsOnlineSession) | Out-Null
+        Get-Command Test-CsEffectiveTenantDialPlan -ErrorAction SilentlyContinue | Out-Null
+        $result = $?
+        return $result
+
+    }
+
+    if (-not (TeamsConnected)) {
+
+        if (Get-Module -ListAvailable -Name MicrosoftTeams | ? {$_.Version -ge "1.1.6"}) {
+    
+            # Connect to Microsoft Teams
+            Write-Host "`nTeams module installed" -ForegroundColor Green
+            Write-Host "`nCreating PowerShell session..."
+            Import-Module MicrosoftTeams
+            Import-PSSession -Session (New-CsOnlineSession) | Out-Null
+    
+        } else {
+    
+            # Install module and connect to Microsoft Teams
+            Write-Host "`nTeams module is not installed" -ForegroundColor Yellow
+            Write-Host "`nInstalling module and creating PowerShell session..."
+            Install-Module MicrosoftTeams -AllowClobber
+            Import-PSSession -Session (New-CsOnlineSession) | Out-Null
+    
+        }
 
     }
 
